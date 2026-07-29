@@ -21,7 +21,7 @@ import { BottomNavigation } from './BottomNavigation'
 type Props = {
   profile: Profile
   email: string
-  mode: 'groups' | 'study'
+  mode: 'chats' | 'groups' | 'study'
   onNavigate: (section: NavigationSection) => void
   onOpenRoom: (roomId: string) => Promise<void>
   onSignOut: () => Promise<void>
@@ -101,7 +101,7 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
 
   useEffect(() => {
     setFilter(mode === 'study' ? 'Académicas' : 'Todas')
-    setView('list')
+    setView(mode === 'groups' ? 'create' : 'list')
     void loadRooms()
   }, [loadRooms, mode])
 
@@ -146,11 +146,14 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
     setOpeningId(null)
   }
 
-  if (view === 'create') {
+  if (mode === 'groups' || view === 'create') {
     return (
       <CreateRoomPage
         profile={profile}
-        onCancel={() => setView('list')}
+        onCancel={() => {
+          if (mode === 'groups') onNavigate('chats')
+          else setView('list')
+        }}
         onCreated={async (roomId) => {
           await loadRooms()
           await onOpenRoom(roomId)
@@ -183,7 +186,7 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar sala" />
           </label>
 
-          {mode === 'groups' ? (
+          {mode === 'chats' ? (
             <div className="room-filter-tabs" role="tablist" aria-label="Filtrar salas">
               {filters.map((item) => (
                 <button
@@ -247,13 +250,13 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
           </div>
         </div>
 
-        {mode === 'groups' ? (
+        {mode === 'chats' ? (
           <button className="rooms-floating-button" type="button" onClick={() => setView('create')} aria-label="Crear sala">
             <Plus size={27} />
           </button>
         ) : null}
 
-        <BottomNavigation active={mode} onNavigate={onNavigate} />
+        <BottomNavigation active={mode === 'study' ? 'study' : 'chats'} onNavigate={onNavigate} />
       </div>
     </section>
   )

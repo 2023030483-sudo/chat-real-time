@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import type { ConversationSummary, NavigationSection } from '../types'
 import { ConversationList } from './ConversationList'
 import { ChatView } from './ChatView'
-import { WelcomePanel } from './WelcomePanel'
 import { NewChatModal } from './NewChatModal'
 import { ProfileModal } from './ProfileModal'
 import { GroupRoomsPage } from './GroupRoomsPage'
@@ -95,7 +94,51 @@ export function ChatShell() {
     )
   }
 
-  if (section === 'groups' || section === 'study') {
+  if (selected) {
+    return (
+      <main className="app-shell app-shell--chat-open">
+        <ConversationList
+          profile={profile}
+          conversations={conversations}
+          selectedId={selected.id}
+          loading={loading}
+          search={search}
+          onSearch={setSearch}
+          onSelect={setSelected}
+          onNewChat={() => setNewChatOpen(true)}
+          onProfile={() => setProfileOpen(true)}
+          onNavigate={navigate}
+        />
+
+        <ChatView
+          key={selected.id}
+          conversation={selected}
+          currentUser={profile}
+          onBack={() => setSelected(null)}
+          onMessageSent={() => void loadConversations(selected.id)}
+          onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
+        />
+
+        {newChatOpen ? (
+          <NewChatModal currentUserId={user.id} onClose={() => setNewChatOpen(false)} onCreated={(id) => void handleCreated(id)} />
+        ) : null}
+
+        {profileOpen ? (
+          <ProfileModal
+            profile={profile}
+            onClose={() => setProfileOpen(false)}
+            onSaved={refreshProfile}
+            onSignOut={async () => {
+              setProfileOpen(false)
+              await signOut()
+            }}
+          />
+        ) : null}
+      </main>
+    )
+  }
+
+  if (section === 'chats' || section === 'groups' || section === 'study') {
     return (
       <main className="app-shell app-shell--section-open">
         <GroupRoomsPage
@@ -118,49 +161,6 @@ export function ChatShell() {
     )
   }
 
-  return (
-    <main className={`app-shell ${selected ? 'app-shell--chat-open' : ''}`}>
-      <ConversationList
-        profile={profile}
-        conversations={conversations}
-        selectedId={selected?.id ?? null}
-        loading={loading}
-        search={search}
-        onSearch={setSearch}
-        onSelect={setSelected}
-        onNewChat={() => setNewChatOpen(true)}
-        onProfile={() => setProfileOpen(true)}
-        onNavigate={navigate}
-      />
-
-      {selected ? (
-        <ChatView
-          key={selected.id}
-          conversation={selected}
-          currentUser={profile}
-          onBack={() => setSelected(null)}
-          onMessageSent={() => void loadConversations(selected.id)}
-          onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
-        />
-      ) : (
-        <WelcomePanel onNewChat={() => setNewChatOpen(true)} />
-      )}
-
-      {newChatOpen ? (
-        <NewChatModal currentUserId={user.id} onClose={() => setNewChatOpen(false)} onCreated={(id) => void handleCreated(id)} />
-      ) : null}
-
-      {profileOpen ? (
-        <ProfileModal
-          profile={profile}
-          onClose={() => setProfileOpen(false)}
-          onSaved={refreshProfile}
-          onSignOut={async () => {
-            setProfileOpen(false)
-            await signOut()
-          }}
-        />
-      ) : null}
-    </main>
-  )
+  return null
 }
+
