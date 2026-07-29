@@ -33,3 +33,37 @@ export type ChatMessage = {
   deleted_at: string | null
   sender?: Profile | null
 }
+
+export type NavigationSection = 'chats' | 'groups' | 'study' | 'profile'
+
+export type GroupRoom = {
+  id: string
+  title: string
+  description: string | null
+  category: 'Académicas' | 'Social' | 'Urgente' | string
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+  creator_id: string
+  creator_name: string
+  creator_avatar: string | null
+  is_member: boolean
+  member_count: number
+  last_message: string | null
+  last_message_at: string | null
+  unread_count: number
+}
+
+export type RoomDetails = {
+  id: string
+  title: string
+  description: string | null
+  category: string
+  avatar_url: string | null
+  created_at: string
+  creator_id: string
+  creator_name: string
+  creator_avatar: string | null
+  member_count: number
+  message_count: number
+}

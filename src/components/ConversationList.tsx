@@ -1,6 +1,7 @@
 import { MessageSquarePlus, Search, Settings } from 'lucide-react'
-import type { ConversationSummary, Profile } from '../types'
+import type { ConversationSummary, NavigationSection, Profile } from '../types'
 import { Avatar } from './Avatar'
+import { BottomNavigation } from './BottomNavigation'
 
 type Props = {
   profile: Profile
@@ -12,6 +13,7 @@ type Props = {
   onSelect: (conversation: ConversationSummary) => void
   onNewChat: () => void
   onProfile: () => void
+  onNavigate: (section: NavigationSection) => void
 }
 
 function formatConversationTime(value: string | null) {
@@ -34,8 +36,10 @@ export function ConversationList({
   onSelect,
   onNewChat,
   onProfile,
+  onNavigate,
 }: Props) {
   const visible = conversations.filter((conversation) => {
+    if (conversation.type !== 'direct') return false
     const term = search.toLowerCase().trim()
     if (!term) return true
     return [conversation.title, conversation.other_user_name, conversation.other_user_username, conversation.last_message]
@@ -84,8 +88,8 @@ export function ConversationList({
         ) : null}
 
         {visible.map((conversation) => {
-          const name = conversation.type === 'direct' ? conversation.other_user_name : conversation.title
-          const avatar = conversation.type === 'direct' ? conversation.other_user_avatar : conversation.avatar_url
+          const name = conversation.other_user_name
+          const avatar = conversation.other_user_avatar
           return (
             <button
               className={`conversation-row ${selectedId === conversation.id ? 'active' : ''}`}
@@ -107,6 +111,8 @@ export function ConversationList({
           )
         })}
       </div>
+
+      <BottomNavigation active="chats" onNavigate={onNavigate} />
     </aside>
   )
 }

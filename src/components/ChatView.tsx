@@ -9,6 +9,7 @@ type Props = {
   currentUser: Profile
   onBack: () => void
   onMessageSent: () => void
+  onInfo?: () => void
 }
 
 function formatMessageTime(value: string) {
@@ -25,7 +26,7 @@ function formatDateDivider(value: string) {
   return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-export function ChatView({ conversation, currentUser, onBack, onMessageSent }: Props) {
+export function ChatView({ conversation, currentUser, onBack, onMessageSent, onInfo }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(true)
@@ -138,7 +139,7 @@ export function ChatView({ conversation, currentUser, onBack, onMessageSent }: P
           <strong>{displayName || 'Conversación'}</strong>
           <small>{subtitle}</small>
         </div>
-        <button className="icon-button chat-header__more" aria-label="Más opciones"><MoreVertical size={20} /></button>
+        <button className="icon-button chat-header__more" type="button" onClick={onInfo} disabled={!onInfo} aria-label={onInfo ? "Información de la sala" : "Más opciones"}><MoreVertical size={20} /></button>
       </header>
 
       <div className="messages-area">

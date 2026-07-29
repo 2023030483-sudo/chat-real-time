@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { ConversationSummary } from '../types'
+import type { ConversationSummary, NavigationSection } from '../types'
 import { ConversationList } from './ConversationList'
 import { ChatView } from './ChatView'
 import { WelcomePanel } from './WelcomePanel'
 import { NewChatModal } from './NewChatModal'
 import { ProfileModal } from './ProfileModal'
+import { GroupRoomsPage } from './GroupRoomsPage'
+import { AccountPage } from './AccountPage'
+import { RoomInfoPage } from './RoomInfoPage'
 
 export function ChatShell() {
   const { user, profile, refreshProfile, signOut } = useAuth()
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [selected, setSelected] = useState<ConversationSummary | null>(null)
+  const [roomInfo, setRoomInfo] = useState<ConversationSummary | null>(null)
+  const [section, setSection] = useState<NavigationSection>('chats')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [newChatOpen, setNewChatOpen] = useState(false)
@@ -52,7 +57,65 @@ export function ChatShell() {
 
   const handleCreated = async (conversationId: string) => {
     setNewChatOpen(false)
+    setSection('chats')
     await loadConversations(conversationId)
+  }
+
+  const navigate = (next: NavigationSection) => {
+    setRoomInfo(null)
+    setSelected(null)
+    setSection(next)
+  }
+
+  const openGroupRoom = async (roomId: string) => {
+    setRoomInfo(null)
+    setSection('chats')
+    await loadConversations(roomId)
+  }
+
+  const contactRoomCreator = async (creatorId: string) => {
+    const { data, error } = await supabase.rpc('create_direct_conversation', { other_user_id: creatorId })
+    if (error || !data) throw new Error(error?.message ?? 'No fue posible abrir la conversación.')
+    setRoomInfo(null)
+    setSection('chats')
+    await loadConversations(String(data))
+  }
+
+  if (roomInfo) {
+    return (
+      <main className="app-shell app-shell--section-open">
+        <RoomInfoPage
+          conversation={roomInfo}
+          currentUser={profile}
+          onBackToChat={() => setRoomInfo(null)}
+          onNavigate={navigate}
+          onContactCreator={contactRoomCreator}
+        />
+      </main>
+    )
+  }
+
+  if (section === 'groups' || section === 'study') {
+    return (
+      <main className="app-shell app-shell--section-open">
+        <GroupRoomsPage
+          profile={profile}
+          email={user.email ?? `@${profile.username}`}
+          mode={section}
+          onNavigate={navigate}
+          onOpenRoom={openGroupRoom}
+          onSignOut={signOut}
+        />
+      </main>
+    )
+  }
+
+  if (section === 'profile') {
+    return (
+      <main className="app-shell app-shell--section-open">
+        <AccountPage user={user} profile={profile} onNavigate={navigate} onSignOut={signOut} />
+      </main>
+    )
   }
 
   return (
@@ -67,6 +130,7 @@ export function ChatShell() {
         onSelect={setSelected}
         onNewChat={() => setNewChatOpen(true)}
         onProfile={() => setProfileOpen(true)}
+        onNavigate={navigate}
       />
 
       {selected ? (
@@ -76,6 +140,7 @@ export function ChatShell() {
           currentUser={profile}
           onBack={() => setSelected(null)}
           onMessageSent={() => void loadConversations(selected.id)}
+          onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
         />
       ) : (
         <WelcomePanel onNewChat={() => setNewChatOpen(true)} />
