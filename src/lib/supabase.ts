@@ -1,18 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Faltan VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY. Copia .env.example como .env.local.',
-  )
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-})
+// Archivo conservado únicamente para que una copia sobre el proyecto anterior no falle.
+// La aplicación ya no importa ni utiliza Supabase. El backend activo está en firebase.ts y firebaseChat.ts.
+export {}

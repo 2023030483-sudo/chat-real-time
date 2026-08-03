@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import {
+  createDirectConversation,
+  getProfile,
+  subscribeMyConversations,
+} from '../lib/firebaseChat'
 import type { ConversationSummary, NavigationSection } from '../types'
 import { ConversationList } from './ConversationList'
 import { ChatView } from './ChatView'
@@ -15,69 +19,89 @@ export function ChatShell() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [selected, setSelected] = useState<ConversationSummary | null>(null)
   const [roomInfo, setRoomInfo] = useState<ConversationSummary | null>(null)
+  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null)
   const [section, setSection] = useState<NavigationSection>('chats')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [newChatOpen, setNewChatOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
-  const loadConversations = useCallback(async (selectId?: string) => {
-    setLoading(true)
-    const { data, error } = await supabase.rpc('get_my_conversations')
-    if (error) {
-      console.error('No fue posible cargar las conversaciones:', error.message)
-      setLoading(false)
-      return
-    }
-
-    const next = ((data ?? []) as ConversationSummary[]).map((item) => ({
-      ...item,
-      unread_count: Number(item.unread_count ?? 0),
-    }))
-    setConversations(next)
-    const targetId = selectId ?? selected?.id
-    if (targetId) setSelected(next.find((item) => item.id === targetId) ?? null)
-    setLoading(false)
-  }, [selected?.id])
-
   useEffect(() => {
-    void loadConversations()
-    const channel = supabase
-      .channel('conversation-list-events')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => void loadConversations())
-      .subscribe()
+    if (!user) return
+    let active = true
+    let unsubscribe: (() => void) | null = null
+    setLoading(true)
+
+    void subscribeMyConversations(
+      user.id,
+      (next) => {
+        if (!active) return
+        setConversations(next)
+        setSelected((current) => {
+          const targetId = pendingSelectionId ?? current?.id
+          if (!targetId) return current
+          return next.find((item) => item.id === targetId) ?? current
+        })
+        if (pendingSelectionId && next.some((item) => item.id === pendingSelectionId)) {
+          setPendingSelectionId(null)
+        }
+        setLoading(false)
+      },
+      (error) => {
+        console.error('No fue posible cargar las conversaciones:', error)
+        if (active) setLoading(false)
+      },
+    ).then((stop) => {
+      if (!active) stop()
+      else unsubscribe = stop
+    }).catch((error) => {
+      console.error('No fue posible conectar con Firestore:', error)
+      if (active) setLoading(false)
+    })
 
     return () => {
-      void supabase.removeChannel(channel)
+      active = false
+      unsubscribe?.()
     }
-  }, [loadConversations])
+  }, [user?.id, pendingSelectionId])
 
   if (!user || !profile) return null
 
-  const handleCreated = async (conversationId: string) => {
+  const selectConversation = (conversationId: string) => {
+    const existing = conversations.find((item) => item.id === conversationId)
+    if (existing) {
+      setSelected(existing)
+      setPendingSelectionId(null)
+    } else {
+      setPendingSelectionId(conversationId)
+    }
+  }
+
+  const handleCreated = (conversationId: string) => {
     setNewChatOpen(false)
     setSection('chats')
-    await loadConversations(conversationId)
+    selectConversation(conversationId)
   }
 
   const navigate = (next: NavigationSection) => {
     setRoomInfo(null)
     setSelected(null)
+    setPendingSelectionId(null)
     setSection(next)
   }
 
   const openGroupRoom = async (roomId: string) => {
     setRoomInfo(null)
     setSection('chats')
-    await loadConversations(roomId)
+    selectConversation(roomId)
   }
 
   const contactRoomCreator = async (creatorId: string) => {
-    const { data, error } = await supabase.rpc('create_direct_conversation', { other_user_id: creatorId })
-    if (error || !data) throw new Error(error?.message ?? 'No fue posible abrir la conversación.')
+    const creatorProfile = await getProfile(creatorId)
+    const conversationId = await createDirectConversation(profile, creatorProfile)
     setRoomInfo(null)
     setSection('chats')
-    await loadConversations(String(data))
+    selectConversation(conversationId)
   }
 
   if (roomInfo) {
@@ -115,12 +139,12 @@ export function ChatShell() {
           conversation={selected}
           currentUser={profile}
           onBack={() => setSelected(null)}
-          onMessageSent={() => void loadConversations(selected.id)}
+          onMessageSent={() => undefined}
           onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
         />
 
         {newChatOpen ? (
-          <NewChatModal currentUserId={user.id} onClose={() => setNewChatOpen(false)} onCreated={(id) => void handleCreated(id)} />
+          <NewChatModal currentUser={profile} onClose={() => setNewChatOpen(false)} onCreated={handleCreated} />
         ) : null}
 
         {profileOpen ? (
@@ -163,4 +187,3 @@ export function ChatShell() {
 
   return null
 }
-

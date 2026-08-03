@@ -1,11 +1,10 @@
 import { GraduationCap, LogOut, Mail, ShieldCheck } from 'lucide-react'
-import type { User } from '@supabase/supabase-js'
-import type { NavigationSection, Profile } from '../types'
+import type { AuthUser, NavigationSection, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { BottomNavigation } from './BottomNavigation'
 
 type Props = {
-  user: User
+  user: AuthUser
   profile: Profile
   onNavigate: (section: NavigationSection) => void
   onSignOut: () => Promise<void>
@@ -41,7 +40,7 @@ export function AccountPage({ user, profile, onNavigate, onSignOut }: Props) {
 
           <article className="account-card account-card--security">
             <div className="account-card__label"><ShieldCheck size={17} /> Seguridad</div>
-            <p>Sesión iniciada con Supabase Auth</p>
+            <p>Sesión iniciada con Firebase Authentication</p>
             <small><span /> Protección activa</small>
           </article>
 

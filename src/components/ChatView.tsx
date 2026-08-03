@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, Info, MoreVertical, Search, Send, Smile } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import type { ChatMessage, ConversationSummary, Profile } from '../types'
+import {
+  markConversationRead,
+  sendMessage as sendFirebaseMessage,
+  subscribeMembers,
+  subscribeMessages,
+} from '../lib/firebaseChat'
+import type { ChatMessage, ConversationSummary, Profile, RoomMember } from '../types'
 import { Avatar } from './Avatar'
 
 type Props = {
@@ -10,17 +15,6 @@ type Props = {
   onBack: () => void
   onMessageSent: () => void
   onInfo?: () => void
-}
-
-type RoomMember = {
-  user_id: string
-  role: 'owner' | 'admin' | 'member'
-  joined_at: string
-  profile: Profile | null
-}
-
-type RawRoomMember = Omit<RoomMember, 'profile'> & {
-  profile: Profile | Profile[] | null
 }
 
 function formatMessageTime(value: string) {
@@ -60,63 +54,44 @@ export function ChatView({ conversation, currentUser, onBack, onMessageSent, onI
   const displayAvatar = conversation.type === 'direct' ? conversation.other_user_avatar : conversation.avatar_url
   const subtitle = conversation.type === 'direct' ? `@${conversation.other_user_username ?? 'usuario'}` : 'Conversación grupal'
 
-  const addMessage = (message: ChatMessage) => {
-    setMessages((current) => {
-      if (current.some((item) => item.id === message.id)) return current
-      return [...current, message].sort((a, b) => a.id - b.id)
-    })
-  }
-
   useEffect(() => {
     let active = true
+    let unsubscribe: (() => void) | null = null
     setLoading(true)
     setMessages([])
     setError('')
 
-    const loadMessages = async () => {
-      const { data, error: loadError } = await supabase
-        .from('messages')
-        .select('id, conversation_id, sender_id, body, message_type, created_at, updated_at, deleted_at, sender:profiles!messages_sender_id_fkey(id, username, full_name, avatar_url, status)')
-        .eq('conversation_id', conversation.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-        .limit(500)
-
+    void subscribeMessages(
+      conversation.id,
+      (nextMessages) => {
+        if (!active) return
+        setMessages(nextMessages)
+        setLoading(false)
+        void markConversationRead(conversation.id, currentUser).catch(() => undefined)
+      },
+      (caught) => {
+        if (!active) return
+        setError(caught.message)
+        setLoading(false)
+      },
+    ).then((stop) => {
+      if (!active) stop()
+      else unsubscribe = stop
+    }).catch((caught) => {
       if (!active) return
-      if (loadError) setError(loadError.message)
-      setMessages((data ?? []) as unknown as ChatMessage[])
+      setError(caught instanceof Error ? caught.message : 'No fue posible cargar los mensajes.')
       setLoading(false)
-      await supabase.rpc('mark_conversation_read', { conversation_uuid: conversation.id })
-    }
-
-    void loadMessages()
-
-    const channel = supabase
-      .channel(`messages:${conversation.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversation.id}` },
-        async (payload) => {
-          const raw = payload.new as ChatMessage
-          const { data: sender } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url, status')
-            .eq('id', raw.sender_id)
-            .single()
-          addMessage({ ...raw, sender: (sender as Profile | null) ?? null })
-          await supabase.rpc('mark_conversation_read', { conversation_uuid: conversation.id })
-        },
-      )
-      .subscribe()
+    })
 
     return () => {
       active = false
-      void supabase.removeChannel(channel)
+      unsubscribe?.()
     }
-  }, [conversation.id])
+  }, [conversation.id, currentUser.id])
 
   useEffect(() => {
     let active = true
+    let unsubscribe: (() => void) | null = null
     setMembers([])
     setMemberSearch('')
     setMembersError('')
@@ -128,35 +103,31 @@ export function ChatView({ conversation, currentUser, onBack, onMessageSent, onI
       }
     }
 
-    const loadMembers = async () => {
-      setMembersLoading(true)
-
-      const { data, error: loadError } = await supabase
-        .from('conversation_members')
-        .select('user_id, role, joined_at, profile:profiles!conversation_members_user_id_fkey(id, username, full_name, avatar_url, status)')
-        .eq('conversation_id', conversation.id)
-        .order('joined_at', { ascending: true })
-
-      if (!active) return
-
-      if (loadError) {
-        setMembersError(loadError.message)
+    setMembersLoading(true)
+    void subscribeMembers(
+      conversation.id,
+      (nextMembers) => {
+        if (!active) return
+        setMembers(nextMembers)
         setMembersLoading(false)
-        return
-      }
-
-      const rows = (data ?? []) as unknown as RawRoomMember[]
-      setMembers(rows.map((row) => ({
-        ...row,
-        profile: Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile,
-      })))
+      },
+      (caught) => {
+        if (!active) return
+        setMembersError(caught.message)
+        setMembersLoading(false)
+      },
+    ).then((stop) => {
+      if (!active) stop()
+      else unsubscribe = stop
+    }).catch((caught) => {
+      if (!active) return
+      setMembersError(caught instanceof Error ? caught.message : 'No fue posible cargar los miembros.')
       setMembersLoading(false)
-    }
-
-    void loadMembers()
+    })
 
     return () => {
       active = false
+      unsubscribe?.()
     }
   }, [conversation.id, isGroup])
 
@@ -192,20 +163,15 @@ export function ChatView({ conversation, currentUser, onBack, onMessageSent, onI
     setError('')
     setBody('')
 
-    const { data, error: sendError } = await supabase
-      .from('messages')
-      .insert({ conversation_id: conversation.id, sender_id: currentUser.id, body: cleanBody })
-      .select('id, conversation_id, sender_id, body, message_type, created_at, updated_at, deleted_at')
-      .single()
-
-    if (sendError) {
-      setBody(cleanBody)
-      setError(sendError.message)
-    } else {
-      addMessage({ ...(data as ChatMessage), sender: currentUser })
+    try {
+      await sendFirebaseMessage(conversation.id, currentUser, cleanBody)
       onMessageSent()
+    } catch (caught) {
+      setBody(cleanBody)
+      setError(caught instanceof Error ? caught.message : 'No fue posible enviar el mensaje.')
+    } finally {
+      setSending(false)
     }
-    setSending(false)
   }
 
   return (

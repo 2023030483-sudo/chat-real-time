@@ -1,0 +1,1 @@
+Ejecuta npm run android:sync para generar aquí la versión web conectada a Firebase.

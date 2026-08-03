@@ -7,7 +7,7 @@ import {
   Mail,
   MessageSquareText,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { getRoomDetails } from '../lib/firebaseChat'
 import type { ConversationSummary, NavigationSection, Profile, RoomDetails } from '../types'
 import { Avatar } from './Avatar'
 import { BottomNavigation } from './BottomNavigation'
@@ -42,30 +42,16 @@ export function RoomInfoPage({ conversation, currentUser, onBackToChat, onNaviga
     const load = async () => {
       setLoading(true)
       setError('')
-      const { data, error: loadError } = await supabase.rpc('get_group_room_details', {
-        room_uuid: conversation.id,
-      })
-      if (!active) return
-
-      if (loadError) {
-        setError(loadError.message)
-        setLoading(false)
-        return
+      try {
+        const nextDetails = await getRoomDetails(conversation.id)
+        if (!active) return
+        setDetails(nextDetails)
+      } catch (caught) {
+        if (!active) return
+        setError(caught instanceof Error ? caught.message : 'No fue posible cargar la información de la sala.')
+      } finally {
+        if (active) setLoading(false)
       }
-
-      const row = Array.isArray(data) ? data[0] : data
-      if (!row) {
-        setError('No fue posible encontrar la información de esta sala.')
-        setLoading(false)
-        return
-      }
-
-      setDetails({
-        ...(row as RoomDetails),
-        member_count: Number((row as RoomDetails).member_count ?? 0),
-        message_count: Number((row as RoomDetails).message_count ?? 0),
-      })
-      setLoading(false)
     }
 
     void load()

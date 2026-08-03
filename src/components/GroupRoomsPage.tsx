@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   ArrowLeft,
   BadgeCheck,
@@ -13,7 +13,12 @@ import {
   Search,
   UsersRound,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import {
+  createGroupConversation,
+  ensureDefaultRooms,
+  joinGroupRoom,
+  subscribeGroupRooms,
+} from '../lib/firebaseChat'
 import type { GroupRoom, NavigationSection, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { BottomNavigation } from './BottomNavigation'
@@ -71,50 +76,43 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
   const [view, setView] = useState<PageView>('list')
   const [openingId, setOpeningId] = useState<string | null>(null)
 
-  const loadRooms = useCallback(async () => {
+  useEffect(() => {
+    let active = true
+    let unsubscribe: (() => void) | null = null
+    setFilter(mode === 'study' ? 'Académicas' : 'Todas')
+    setView(mode === 'groups' ? 'create' : 'list')
     setLoading(true)
     setError('')
 
-    const { error: defaultsError } = await supabase.rpc('ensure_default_rooms')
-    if (defaultsError) {
-      setError(defaultsError.message)
-      setLoading(false)
-      return
-    }
-
-    const { data, error: roomsError } = await supabase.rpc('get_group_rooms')
-    if (roomsError) {
-      setError(roomsError.message)
-      setLoading(false)
-      return
-    }
-
-    const normalized = ((data ?? []) as GroupRoom[]).map((room) => ({
-      ...room,
-      member_count: Number(room.member_count ?? 0),
-      unread_count: Number(room.unread_count ?? 0),
-      is_member: Boolean(room.is_member),
-    }))
-    setRooms(normalized)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    setFilter(mode === 'study' ? 'Académicas' : 'Todas')
-    setView(mode === 'groups' ? 'create' : 'list')
-    void loadRooms()
-  }, [loadRooms, mode])
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`group-room-list:${mode}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => void loadRooms())
-      .subscribe()
+    void ensureDefaultRooms(profile)
+      .then(() => subscribeGroupRooms(
+        profile.id,
+        (nextRooms) => {
+          if (!active) return
+          setRooms(nextRooms)
+          setLoading(false)
+        },
+        (caught) => {
+          if (!active) return
+          setError(caught.message)
+          setLoading(false)
+        },
+      ))
+      .then((stop) => {
+        if (!active) stop()
+        else unsubscribe = stop
+      })
+      .catch((caught) => {
+        if (!active) return
+        setError(caught instanceof Error ? caught.message : 'No fue posible cargar las salas.')
+        setLoading(false)
+      })
 
     return () => {
-      void supabase.removeChannel(channel)
+      active = false
+      unsubscribe?.()
     }
-  }, [loadRooms, mode])
+  }, [mode, profile.id])
 
   const visibleRooms = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -134,9 +132,10 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
     setError('')
 
     if (!room.is_member) {
-      const { error: joinError } = await supabase.rpc('join_group_conversation', { room_uuid: room.id })
-      if (joinError) {
-        setError(joinError.message)
+      try {
+        await joinGroupRoom(room.id, profile)
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'No fue posible unirte a la sala.')
         setOpeningId(null)
         return
       }
@@ -154,10 +153,7 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
           if (mode === 'groups') onNavigate('chats')
           else setView('list')
         }}
-        onCreated={async (roomId) => {
-          await loadRooms()
-          await onOpenRoom(roomId)
-        }}
+        onCreated={onOpenRoom}
         onNavigate={onNavigate}
         onSignOut={onSignOut}
       />
@@ -282,20 +278,19 @@ function CreateRoomPage({ profile, onCancel, onCreated, onNavigate, onSignOut }:
     setBusy(true)
     setError('')
 
-    const { data, error: createError } = await supabase.rpc('create_group_conversation', {
-      room_title: name.trim(),
-      room_description: description.trim(),
-      room_category: 'Académicas',
-    })
-
-    if (createError || !data) {
-      setError(createError?.message ?? 'No fue posible crear la sala.')
+    try {
+      const roomId = await createGroupConversation(
+        profile,
+        name.trim(),
+        description.trim(),
+        'Académicas',
+      )
+      await onCreated(roomId)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No fue posible crear la sala.')
+    } finally {
       setBusy(false)
-      return
     }
-
-    await onCreated(String(data))
-    setBusy(false)
   }
 
   return (

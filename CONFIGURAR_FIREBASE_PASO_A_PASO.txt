@@ -1,0 +1,149 @@
+CHAT REAL TIME - CONFIGURACIÓN DE FIREBASE
+
+IMPORTANTE
+- El diseño y las pantallas se conservan.
+- Supabase ya no se utiliza desde el código.
+- Los datos anteriores de Supabase no se transfieren automáticamente.
+- El archivo .env.local no viene dentro de esta entrega para no sobrescribir tus claves.
+
+1. CREAR EL PROYECTO EN FIREBASE
+
+Entra a Firebase Console y presiona "Crear un proyecto".
+Puedes llamarlo: chat-real-time
+Google Analytics es opcional y no es necesario para este proyecto.
+
+2. AGREGAR UNA APLICACIÓN WEB
+
+Dentro del proyecto de Firebase, presiona el icono Web: </>
+Nombre sugerido: chat-real-time-web
+No actives Firebase Hosting porque la página seguirá publicada en Netlify.
+
+Firebase mostrará un objeto firebaseConfig. De ahí copiarás:
+- apiKey
+- authDomain
+- projectId
+- storageBucket
+- messagingSenderId
+- appId
+
+3. ACTIVAR FIREBASE AUTHENTICATION
+
+En Firebase entra a:
+Compilación > Authentication > Comenzar > Método de acceso
+
+Activa:
+Correo electrónico/Contraseña
+
+No necesitas activar el enlace por correo.
+
+4. CREAR CLOUD FIRESTORE
+
+En Firebase entra a:
+Compilación > Firestore Database > Crear base de datos
+
+Selecciona modo Producción.
+Elige una ubicación cercana y confirma.
+
+Después entra a la pestaña Reglas.
+Abre el archivo firestore.rules de este proyecto.
+Copia todo con Ctrl+A y Ctrl+C.
+Pégalo en las reglas de Firestore y presiona Publicar.
+
+5. ACTIVAR CLOUD STORAGE
+
+En Firebase entra a:
+Compilación > Storage > Comenzar
+
+Elige la misma ubicación del proyecto.
+Después entra a la pestaña Reglas.
+Abre el archivo storage.rules de este proyecto.
+Copia todo y presiona Publicar.
+
+6. CONFIGURAR EL ARCHIVO .env.local
+
+Conserva tu archivo actual como respaldo.
+Abre:
+C:\Proyectos\chat-real-time\.env.local
+
+Reemplaza su contenido por:
+
+VITE_FIREBASE_API_KEY=PEGA_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=PEGA_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID=PEGA_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET=PEGA_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID=PEGA_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID=PEGA_APP_ID
+
+No uses comillas y no dejes espacios alrededor del signo igual.
+
+7. EJECUTAR EN EL NAVEGADOR
+
+Abre la terminal de Visual Studio Code y ejecuta:
+
+cd C:\Proyectos\chat-real-time
+npm install
+npm run dev
+
+Abre:
+http://localhost:5173
+
+Registra dos usuarios distintos para probar conversaciones privadas y salas.
+
+8. CONFIGURAR NETLIFY
+
+En Netlify entra a:
+Project configuration > Environment variables
+
+Agrega estas variables con los mismos valores del .env.local:
+- VITE_FIREBASE_API_KEY
+- VITE_FIREBASE_AUTH_DOMAIN
+- VITE_FIREBASE_PROJECT_ID
+- VITE_FIREBASE_STORAGE_BUCKET
+- VITE_FIREBASE_MESSAGING_SENDER_ID
+- VITE_FIREBASE_APP_ID
+
+Después entra a Deploys > Trigger deploy > Clear cache and deploy site.
+
+Cuando Firebase funcione, puedes eliminar de Netlify las variables antiguas:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_PUBLISHABLE_KEY
+
+9. AUTORIZAR EL DOMINIO DE NETLIFY
+
+En Firebase entra a:
+Authentication > Configuración > Dominios autorizados
+
+Agrega el dominio de tu página, por ejemplo:
+chat-real-time2.netlify.app
+
+localhost normalmente ya aparece autorizado.
+
+10. SUBIR LOS CAMBIOS A GITHUB
+
+En la terminal:
+
+git add .
+git commit -m "Migrar backend a Firebase Firestore"
+git push origin main
+
+Netlify volverá a publicar automáticamente.
+
+11. ACTUALIZAR ANDROID STUDIO
+
+En la terminal:
+
+npm run android:sync
+npm run android:open
+
+En Android Studio selecciona tu celular o emulador y presiona Run.
+
+12. CÓMO FUNCIONA AHORA
+
+- Authentication crea y valida las cuentas.
+- La colección profiles guarda nombre, usuario, estado y avatar.
+- La colección conversations guarda chats privados y salas.
+- Cada conversación tiene la subcolección members.
+- Cada conversación tiene la subcolección messages.
+- Firestore onSnapshot actualiza mensajes y salas en tiempo real.
+- Storage guarda las imágenes en avatars/ID_DEL_USUARIO/.
+- Las reglas impiden que un usuario lea mensajes privados de conversaciones ajenas.

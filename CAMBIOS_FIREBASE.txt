@@ -1,0 +1,43 @@
+CAMBIOS REALIZADOS
+
+El backend de la aplicación se cambió de Supabase a Firebase.
+
+NUEVOS ARCHIVOS
+- src/lib/firebase.ts
+- src/lib/firebaseChat.ts
+- firestore.rules
+- storage.rules
+- firestore.indexes.json
+- firebase.json
+- CONFIGURAR_FIREBASE_PASO_A_PASO.txt
+
+ARCHIVOS ACTUALIZADOS
+- src/App.tsx
+- src/context/AuthContext.tsx
+- src/components/AuthPage.tsx
+- src/components/AccountPage.tsx
+- src/components/ProfileModal.tsx
+- src/components/NewChatModal.tsx
+- src/components/ChatShell.tsx
+- src/components/ChatView.tsx
+- src/components/GroupRoomsPage.tsx
+- src/components/RoomInfoPage.tsx
+- src/types.ts
+- src/vite-env.d.ts
+- package.json
+- package-lock.json
+- .env.example
+- README.md
+- .github/workflows/build.yml
+
+RETIRADO DEL CÓDIGO ACTIVO
+- La dependencia @supabase/supabase-js se eliminó.
+- src/lib/supabase.ts queda como archivo vacío de compatibilidad y no se importa.
+- La carpeta supabase queda solo con un aviso de migración.
+
+NO SE INCLUYÓ NI SE SOBRESCRIBIÓ
+- .env.local
+
+VALIDACIÓN
+- TypeScript se comprobó con tsc -b sin errores.
+- La compilación completa de Vite no se pudo ejecutar en el contenedor porque el node_modules subido pertenecía a Windows y no incluía el binario Linux de Rollup. En tu computadora Windows, npm install instalará el binario correcto.

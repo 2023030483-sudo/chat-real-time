@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, MessageCircle, UserRound } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { createFirebaseAccount, signInFirebase } from '../lib/firebaseChat'
 
 type Mode = 'login' | 'register'
 
@@ -23,30 +23,15 @@ export function AuthPage() {
 
     try {
       if (mode === 'login') {
-        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password })
-        if (loginError) throw loginError
+        await signInFirebase(email, password)
       } else {
-        const normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9._]/g, '')
-        if (normalizedUsername.length < 3) {
-          throw new Error('El nombre de usuario debe tener al menos 3 caracteres válidos.')
-        }
-
-        const { data, error: signupError } = await supabase.auth.signUp({
+        await createFirebaseAccount({
           email,
           password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: {
-              full_name: fullName.trim(),
-              username: normalizedUsername,
-            },
-          },
+          fullName: fullName.trim(),
+          username,
         })
-
-        if (signupError) throw signupError
-        if (!data.session) {
-          setNotice('Cuenta creada. Revisa tu correo para confirmar el registro.')
-        }
+        setNotice('Cuenta creada correctamente.')
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.')

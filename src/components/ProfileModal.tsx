@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Camera, LogOut, X } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { updateProfile, uploadAvatar } from '../lib/firebaseChat'
 import type { Profile } from '../types'
 import { Avatar } from './Avatar'
 
@@ -17,7 +17,7 @@ export function ProfileModal({ profile, onClose, onSaved, onSignOut }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+  const uploadAvatarImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -33,42 +33,33 @@ export function ProfileModal({ profile, onClose, onSaved, onSignOut }: Props) {
 
     setBusy(true)
     setError('')
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const path = `${profile.id}/avatar-${Date.now()}.${extension}`
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-
-    if (uploadError) {
-      setError(uploadError.message)
+    try {
+      const avatarUrl = await uploadAvatar(profile.id, file)
+      await updateProfile(profile.id, { avatar_url: avatarUrl })
+      await onSaved()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No fue posible subir la imagen.')
+    } finally {
       setBusy(false)
-      return
     }
-
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_url: data.publicUrl })
-      .eq('id', profile.id)
-
-    if (updateError) setError(updateError.message)
-    else await onSaved()
-    setBusy(false)
   }
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
     setBusy(true)
     setError('')
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ full_name: fullName.trim(), status: status.trim() || null })
-      .eq('id', profile.id)
-
-    if (updateError) setError(updateError.message)
-    else {
+    try {
+      await updateProfile(profile.id, {
+        full_name: fullName.trim(),
+        status: status.trim() || null,
+      })
       await onSaved()
       onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No fue posible guardar el perfil.')
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
   }
 
   return (
@@ -86,7 +77,7 @@ export function ProfileModal({ profile, onClose, onSaved, onSignOut }: Props) {
           <Avatar profile={profile} size="xl" />
           <label className="camera-button" title="Cambiar foto">
             <Camera size={18} />
-            <input type="file" accept="image/*" onChange={(event) => void uploadAvatar(event)} hidden />
+            <input type="file" accept="image/*" onChange={(event) => void uploadAvatarImage(event)} hidden />
           </label>
         </div>
         <p className="profile-username">@{profile.username}</p>

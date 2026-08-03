@@ -1,3 +1,9 @@
+export type AuthUser = {
+  id: string
+  uid: string
+  email: string | null
+}
+
 export type Profile = {
   id: string
   username: string
@@ -23,7 +29,7 @@ export type ConversationSummary = {
 }
 
 export type ChatMessage = {
-  id: number
+  id: string
   conversation_id: string
   sender_id: string
   body: string
@@ -32,6 +38,13 @@ export type ChatMessage = {
   updated_at: string
   deleted_at: string | null
   sender?: Profile | null
+}
+
+export type RoomMember = {
+  user_id: string
+  role: 'owner' | 'admin' | 'member'
+  joined_at: string
+  profile: Profile | null
 }
 
 export type NavigationSection = 'chats' | 'groups' | 'study' | 'profile'

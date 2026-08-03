@@ -6,13 +6,15 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
-import type { Profile } from '../types'
+import {
+  getProfile,
+  signOutFirebase,
+  subscribeAuth,
+} from '../lib/firebaseChat'
+import type { AuthUser, Profile } from '../types'
 
 type AuthContextValue = {
-  session: Session | null
-  user: User | null
+  user: AuthUser | null
   profile: Profile | null
   loading: boolean
   refreshProfile: () => Promise<void>
@@ -22,70 +24,64 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadProfile = async (userId?: string) => {
-    const id = userId ?? session?.user.id
-    if (!id) {
+  const loadProfile = async (targetUser?: AuthUser | null) => {
+    const current = targetUser ?? user
+    if (!current) {
       setProfile(null)
       return
     }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, avatar_url, status, created_at')
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      console.error('No fue posible cargar el perfil:', error.message)
-      return
-    }
-
-    setProfile(data as Profile)
+    const nextProfile = await getProfile(current.id, current.email)
+    setProfile(nextProfile)
   }
 
   useEffect(() => {
     let active = true
+    let unsubscribe: (() => void) | null = null
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      if (data.session?.user) await loadProfile(data.session.user.id)
-      setLoading(false)
-    })
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      if (nextSession?.user) {
-        window.setTimeout(() => void loadProfile(nextSession.user.id), 0)
-      } else {
-        setProfile(null)
-      }
-      setLoading(false)
+    void subscribeAuth(
+      (nextUser) => {
+        if (!active) return
+        setUser(nextUser)
+        if (nextUser) {
+          void loadProfile(nextUser)
+            .catch((error) => console.error('No fue posible cargar el perfil:', error))
+            .finally(() => active && setLoading(false))
+        } else {
+          setProfile(null)
+          setLoading(false)
+        }
+      },
+      (error) => {
+        console.error('No fue posible iniciar Firebase Auth:', error)
+        if (active) setLoading(false)
+      },
+    ).then((stop) => {
+      if (!active) stop()
+      else unsubscribe = stop
+    }).catch((error) => {
+      console.error('No fue posible conectar con Firebase:', error)
+      if (active) setLoading(false)
     })
 
     return () => {
       active = false
-      listener.subscription.unsubscribe()
+      unsubscribe?.()
     }
   }, [])
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      session,
-      user: session?.user ?? null,
+      user,
       profile,
       loading,
       refreshProfile: () => loadProfile(),
-      signOut: async () => {
-        const { error } = await supabase.auth.signOut({ scope: 'local' })
-        if (error) throw error
-      },
+      signOut: signOutFirebase,
     }),
-    [session, profile, loading],
+    [user, profile, loading],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

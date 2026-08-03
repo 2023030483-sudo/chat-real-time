@@ -4,7 +4,7 @@ import { LoadingScreen } from './components/LoadingScreen'
 import { useAuth } from './context/AuthContext'
 
 export default function App() {
-  const { session, loading } = useAuth()
+  const { user, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  return session ? <ChatShell /> : <AuthPage />
+  return user ? <ChatShell /> : <AuthPage />
 }

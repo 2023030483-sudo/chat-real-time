@@ -1,0 +1,2 @@
+Esta carpeta pertenece al backend anterior y ya no es utilizada por la aplicación.
+Puedes eliminar las migraciones SQL antiguas después de confirmar que Firebase funciona.
