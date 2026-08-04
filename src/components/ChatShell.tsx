@@ -67,6 +67,27 @@ export function ChatShell() {
 
   if (!user || !profile) return null
 
+  // ConversationList originalmente oculta las salas grupales y por eso mostraba
+  // "Aún no hay conversaciones" aunque la sala sí existiera. Para conservar
+  // el diseño de tres columnas, adaptamos solo la representación del panel lateral.
+  const sidebarConversations: ConversationSummary[] = conversations.map((item) => (
+    item.type === 'group'
+      ? {
+          ...item,
+          type: 'direct',
+          other_user_id: null,
+          other_user_name: item.title ?? 'Sala',
+          other_user_username: 'sala',
+          other_user_avatar: item.avatar_url,
+        }
+      : item
+  ))
+
+  const selectFromSidebar = (item: ConversationSummary) => {
+    setSelected(conversations.find((conversation) => conversation.id === item.id) ?? item)
+    setPendingSelectionId(null)
+  }
+
   const selectConversation = (conversationId: string) => {
     const existing = conversations.find((item) => item.id === conversationId)
     if (existing) {
@@ -123,12 +144,12 @@ export function ChatShell() {
       <main className="app-shell app-shell--chat-open">
         <ConversationList
           profile={profile}
-          conversations={conversations}
+          conversations={sidebarConversations}
           selectedId={selected.id}
           loading={loading}
           search={search}
           onSearch={setSearch}
-          onSelect={setSelected}
+          onSelect={selectFromSidebar}
           onNewChat={() => setNewChatOpen(true)}
           onProfile={() => setProfileOpen(true)}
           onNavigate={navigate}

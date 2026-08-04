@@ -153,7 +153,12 @@ export function GroupRoomsPage({ profile, email, mode, onNavigate, onOpenRoom, o
           if (mode === 'groups') onNavigate('chats')
           else setView('list')
         }}
-        onCreated={onOpenRoom}
+        onCreated={async () => {
+          // La sala ya quedó guardada en Firestore. Regresamos a la lista
+          // sin abrirla automáticamente, para conservar el menú inferior.
+          setView('list')
+          onNavigate('chats')
+        }}
         onNavigate={onNavigate}
         onSignOut={onSignOut}
       />
