@@ -49,11 +49,14 @@ export type RoomMember = {
 
 export type NavigationSection = 'chats' | 'groups' | 'study' | 'profile'
 
+export type RoomVisibility = 'public' | 'private'
+
 export type GroupRoom = {
   id: string
   title: string
   description: string | null
   category: 'Académicas' | 'Social' | 'Urgente' | string
+  visibility: RoomVisibility
   avatar_url: string | null
   created_at: string
   updated_at: string
@@ -72,6 +75,7 @@ export type RoomDetails = {
   title: string
   description: string | null
   category: string
+  visibility: RoomVisibility
   avatar_url: string | null
   created_at: string
   creator_id: string

@@ -668,3 +668,221 @@ button:disabled { cursor: not-allowed; opacity: .62; }
     width: 100%;
   }
 }
+
+/* =========================================================
+   SALAS PÚBLICAS, PRIVADAS Y ACCESO POR CÓDIGO
+   ========================================================= */
+
+.room-card__bottomline {
+  gap: 7px;
+}
+
+.room-card__bottomline > small {
+  flex: 1 1 auto;
+}
+
+.room-visibility-badge {
+  min-height: 18px;
+  padding: 0 7px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.room-visibility-badge--public {
+  color: #075dc9;
+  background: #e5efff;
+}
+
+.room-visibility-badge--private {
+  color: #7a3a0d;
+  background: #fff0df;
+}
+
+.room-action-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 5px;
+  margin: 0 0 14px;
+  border-radius: 11px;
+  background: #e9edf5;
+}
+
+.room-action-tabs button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  color: #667087;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.room-action-tabs button.active {
+  color: #075dc9;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(32, 45, 74, .1);
+}
+
+.room-visibility-picker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.room-visibility-picker legend {
+  margin-bottom: 7px;
+  color: #364157;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.room-visibility-picker button {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid #d9dfeb;
+  border-radius: 10px;
+  color: #5b6579;
+  background: #fff;
+  text-align: left;
+}
+
+.room-visibility-picker button > svg {
+  flex: 0 0 auto;
+}
+
+.room-visibility-picker button span {
+  display: grid;
+  gap: 3px;
+}
+
+.room-visibility-picker button strong {
+  color: #273149;
+  font-size: 10px;
+}
+
+.room-visibility-picker button small {
+  color: #657087;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.room-visibility-picker button.active {
+  border-color: #4f91e9;
+  color: #075dc9;
+  background: #eef5ff;
+  box-shadow: 0 0 0 3px #e3efff;
+}
+
+.room-visibility-picker button.active strong {
+  color: #075dc9;
+}
+
+.join-room-form {
+  display: grid;
+  gap: 12px;
+}
+
+.join-room-code-input input {
+  letter-spacing: .18em;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.private-room-success {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  border: 1px solid #cdddf8;
+  border-radius: 13px;
+  background: #f7faff;
+  text-align: center;
+  box-shadow: 0 7px 20px rgba(32, 45, 74, .08);
+}
+
+.private-room-success__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  background: #075dc9;
+}
+
+.private-room-success h2 {
+  margin: 2px 0 0;
+  color: #1c263a;
+  font-size: 18px;
+}
+
+.private-room-success p {
+  max-width: 300px;
+  margin: 0;
+  color: #59657b;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.private-room-code {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed #4f91e9;
+  border-radius: 10px;
+  color: #075dc9;
+  background: #eaf3ff;
+}
+
+.private-room-code code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.private-room-success > small {
+  color: #6d7890;
+  font-size: 9px;
+}
+
+.private-room-success .create-room-submit {
+  width: 100%;
+  margin-top: 5px;
+}
+
+@media (max-width: 420px) {
+  .room-visibility-badge {
+    padding-inline: 5px;
+  }
+
+  .room-visibility-badge svg {
+    display: none;
+  }
+
+  .private-room-code code {
+    font-size: 16px;
+  }
+}

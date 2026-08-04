@@ -7,6 +7,7 @@ import type {
   Profile,
   RoomDetails,
   RoomMember,
+  RoomVisibility,
 } from '../types'
 
 type Unsubscribe = () => void
@@ -16,6 +17,7 @@ type FirestoreConversation = {
   title?: string | null
   description?: string | null
   category?: string | null
+  visibility?: RoomVisibility | null
   avatar_url?: string | null
   created_by: string
   creator_name?: string | null
@@ -27,6 +29,10 @@ type FirestoreConversation = {
   last_message?: string | null
   last_message_at?: any
 }
+
+const ROOM_VISIBILITY_MIGRATION_ID = 'room-visibility-v1'
+const ROOM_INVITE_CODE_LENGTH = 8
+const ROOM_INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 const defaultRooms = [
   {
@@ -368,8 +374,63 @@ export async function createDirectConversation(currentProfile: Profile, otherPro
   return conversationId
 }
 
+function roomVisibility(data: FirestoreConversation): RoomVisibility {
+  return data.visibility === 'private' ? 'private' : 'public'
+}
+
+function normalizeInviteCode(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+function generateInviteCode(): string {
+  const values = new Uint32Array(ROOM_INVITE_CODE_LENGTH)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(values)
+  } else {
+    for (let index = 0; index < values.length; index += 1) {
+      values[index] = Math.floor(Math.random() * 0xffffffff)
+    }
+  }
+
+  return Array.from(values, (value) => (
+    ROOM_INVITE_ALPHABET[value % ROOM_INVITE_ALPHABET.length]
+  )).join('')
+}
+
+async function migrateLegacyRoomsToPublic(): Promise<void> {
+  const { db, firestoreApi } = await getFirebaseServices()
+  const migrationRef = firestoreApi.doc(db, 'migrations', ROOM_VISIBILITY_MIGRATION_ID)
+  const migrationSnapshot = await firestoreApi.getDoc(migrationRef)
+  if (migrationSnapshot.exists()) return
+
+  const legacyQuery = firestoreApi.query(
+    firestoreApi.collection(db, 'conversations'),
+    firestoreApi.where('type', '==', 'group'),
+  )
+  const snapshot = await firestoreApi.getDocs(legacyQuery)
+  const pending = snapshot.docs.filter((item: any) => {
+    const data = item.data() as FirestoreConversation
+    return data.visibility !== 'public' && data.visibility !== 'private'
+  })
+
+  for (let offset = 0; offset < pending.length; offset += 400) {
+    const batch = firestoreApi.writeBatch(db)
+    pending.slice(offset, offset + 400).forEach((item: any) => {
+      batch.update(item.ref, { visibility: 'public' })
+    })
+    await batch.commit()
+  }
+
+  await firestoreApi.setDoc(migrationRef, {
+    id: ROOM_VISIBILITY_MIGRATION_ID,
+    completed_at: firestoreApi.serverTimestamp(),
+  })
+}
+
 export async function ensureDefaultRooms(profile: Profile): Promise<void> {
   const { db, firestoreApi } = await getFirebaseServices()
+  await migrateLegacyRoomsToPublic()
+
   for (const room of defaultRooms) {
     const roomRef = firestoreApi.doc(db, 'conversations', room.id)
     const created = await firestoreApi.runTransaction(db, async (transaction: any) => {
@@ -382,6 +443,7 @@ export async function ensureDefaultRooms(profile: Profile): Promise<void> {
         title: room.title,
         description: room.description,
         category: room.category,
+        visibility: 'public',
         avatar_url: null,
         direct_key: null,
         is_default: true,
@@ -406,9 +468,37 @@ export async function ensureDefaultRooms(profile: Profile): Promise<void> {
         role: 'owner',
         joined_at: now,
         last_read_at: now,
+        invite_code: null,
         profile,
       },
     )
+  }
+}
+
+async function groupRoomFromDocument(
+  item: any,
+  userId: string,
+): Promise<GroupRoom> {
+  const data = item.data() as FirestoreConversation
+  const isMember = data.member_ids.includes(userId)
+
+  return {
+    id: item.id,
+    title: data.title ?? 'Sala',
+    description: data.description ?? null,
+    category: data.category ?? 'Académicas',
+    visibility: roomVisibility(data),
+    avatar_url: data.avatar_url ?? null,
+    created_at: toIso(data.created_at),
+    updated_at: toIso(data.updated_at ?? data.created_at),
+    creator_id: data.created_by,
+    creator_name: data.creator_name ?? 'Administrador',
+    creator_avatar: data.creator_avatar ?? null,
+    is_member: isMember,
+    member_count: data.member_ids.length,
+    last_message: data.last_message ?? null,
+    last_message_at: data.last_message_at ? toIso(data.last_message_at) : null,
+    unread_count: isMember ? await unreadCount(item.id, userId).catch(() => 0) : 0,
   }
 }
 
@@ -418,54 +508,85 @@ export async function subscribeGroupRooms(
   onError: (error: Error) => void,
 ): Promise<Unsubscribe> {
   const { db, firestoreApi } = await getFirebaseServices()
-  const roomQuery = firestoreApi.query(
-    firestoreApi.collection(db, 'conversations'),
-    firestoreApi.where('type', '==', 'group'),
+  const conversations = firestoreApi.collection(db, 'conversations')
+  const publicRoomsQuery = firestoreApi.query(
+    conversations,
+    firestoreApi.where('visibility', '==', 'public'),
   )
+  const myRoomsQuery = firestoreApi.query(
+    conversations,
+    firestoreApi.where('member_ids', 'array-contains', userId),
+  )
+
+  let publicDocuments: any[] = []
+  let memberDocuments: any[] = []
+  let publicReady = false
+  let memberReady = false
   let generation = 0
 
-  return firestoreApi.onSnapshot(
-    roomQuery,
+  const emit = () => {
+    if (!publicReady || !memberReady) return
+    const currentGeneration = ++generation
+    const merged = new Map<string, any>()
+
+    publicDocuments.forEach((item) => {
+      const data = item.data() as FirestoreConversation
+      if (data.type === 'group') merged.set(item.id, item)
+    })
+    memberDocuments.forEach((item) => {
+      const data = item.data() as FirestoreConversation
+      if (data.type === 'group') merged.set(item.id, item)
+    })
+
+    void Promise.all(
+      Array.from(merged.values()).map((item) => groupRoomFromDocument(item, userId)),
+    ).then((rooms) => {
+      if (currentGeneration !== generation) return
+      rooms.sort((a, b) => {
+        const aDate = new Date(a.last_message_at ?? a.updated_at).getTime()
+        const bDate = new Date(b.last_message_at ?? b.updated_at).getTime()
+        return bDate - aDate
+      })
+      onData(rooms)
+    }).catch((caught) => onError(new Error(firebaseErrorMessage(caught))))
+  }
+
+  const unsubscribePublic = firestoreApi.onSnapshot(
+    publicRoomsQuery,
     (snapshot: any) => {
-      const currentGeneration = ++generation
-      void Promise.all(snapshot.docs.map(async (item: any) => {
-        const data = item.data() as FirestoreConversation
-        const isMember = data.member_ids.includes(userId)
-        return {
-          id: item.id,
-          title: data.title ?? 'Sala',
-          description: data.description ?? null,
-          category: data.category ?? 'Académicas',
-          avatar_url: data.avatar_url ?? null,
-          created_at: toIso(data.created_at),
-          updated_at: toIso(data.updated_at ?? data.created_at),
-          creator_id: data.created_by,
-          creator_name: data.creator_name ?? 'Administrador',
-          creator_avatar: data.creator_avatar ?? null,
-          is_member: isMember,
-          member_count: data.member_ids.length,
-          last_message: data.last_message ?? null,
-          last_message_at: data.last_message_at ? toIso(data.last_message_at) : null,
-          unread_count: isMember ? await unreadCount(item.id, userId).catch(() => 0) : 0,
-        } satisfies GroupRoom
-      })).then((rooms) => {
-        if (currentGeneration !== generation) return
-        rooms.sort((a, b) => {
-          const aDate = new Date(a.last_message_at ?? a.updated_at).getTime()
-          const bDate = new Date(b.last_message_at ?? b.updated_at).getTime()
-          return bDate - aDate
-        })
-        onData(rooms)
-      }).catch((caught) => onError(new Error(firebaseErrorMessage(caught))))
+      publicDocuments = snapshot.docs
+      publicReady = true
+      emit()
     },
     (caught: unknown) => onError(new Error(firebaseErrorMessage(caught))),
   )
+
+  const unsubscribeMine = firestoreApi.onSnapshot(
+    myRoomsQuery,
+    (snapshot: any) => {
+      memberDocuments = snapshot.docs
+      memberReady = true
+      emit()
+    },
+    (caught: unknown) => onError(new Error(firebaseErrorMessage(caught))),
+  )
+
+  return () => {
+    unsubscribePublic()
+    unsubscribeMine()
+  }
 }
 
-export async function joinGroupRoom(roomId: string, profile: Profile): Promise<void> {
+export async function joinGroupRoom(
+  roomId: string,
+  profile: Profile,
+  inviteCode?: string,
+): Promise<void> {
   const { db, firestoreApi } = await getFirebaseServices()
   const now = firestoreApi.serverTimestamp()
+  const normalizedCode = inviteCode ? normalizeInviteCode(inviteCode) : null
   const batch = firestoreApi.writeBatch(db)
+
   batch.update(firestoreApi.doc(db, 'conversations', roomId), {
     member_ids: firestoreApi.arrayUnion(profile.id),
     updated_at: now,
@@ -477,6 +598,7 @@ export async function joinGroupRoom(roomId: string, profile: Profile): Promise<v
       role: 'member',
       joined_at: now,
       last_read_at: now,
+      invite_code: normalizedCode,
       profile,
     },
     { merge: true },
@@ -484,20 +606,48 @@ export async function joinGroupRoom(roomId: string, profile: Profile): Promise<v
   await batch.commit()
 }
 
+export async function joinPrivateRoomByCode(
+  code: string,
+  profile: Profile,
+): Promise<string> {
+  const normalizedCode = normalizeInviteCode(code)
+  if (normalizedCode.length !== ROOM_INVITE_CODE_LENGTH) {
+    throw new Error(`El código debe tener ${ROOM_INVITE_CODE_LENGTH} caracteres.`)
+  }
+
+  const { db, firestoreApi } = await getFirebaseServices()
+  const inviteSnapshot = await firestoreApi.getDoc(
+    firestoreApi.doc(db, 'room_invites', normalizedCode),
+  )
+
+  if (!inviteSnapshot.exists()) {
+    throw new Error('El código no existe o ya no es válido.')
+  }
+
+  const invite = inviteSnapshot.data()
+  const roomId = String(invite?.room_id ?? '')
+  if (!roomId) throw new Error('El código de invitación no es válido.')
+
+  await joinGroupRoom(roomId, profile, normalizedCode)
+  return roomId
+}
+
 export async function createGroupConversation(
   profile: Profile,
   title: string,
   description: string,
   category: string,
-): Promise<string> {
+  visibility: RoomVisibility,
+): Promise<{ roomId: string; joinCode: string | null }> {
   const { db, firestoreApi } = await getFirebaseServices()
   const conversationRef = firestoreApi.doc(firestoreApi.collection(db, 'conversations'))
-  const now = firestoreApi.serverTimestamp()
-  await firestoreApi.setDoc(conversationRef, {
+
+  const conversationData = (now: any) => ({
     type: 'group',
     title,
     description: description || null,
     category,
+    visibility,
     avatar_url: null,
     direct_key: null,
     created_by: profile.id,
@@ -509,17 +659,59 @@ export async function createGroupConversation(
     last_message: null,
     last_message_at: null,
   })
-  await firestoreApi.setDoc(
-    firestoreApi.doc(db, 'conversations', conversationRef.id, 'members', profile.id),
-    {
-      user_id: profile.id,
-      role: 'owner',
-      joined_at: now,
-      last_read_at: now,
-      profile,
-    },
-  )
-  return conversationRef.id
+
+  const ownerData = (now: any) => ({
+    user_id: profile.id,
+    role: 'owner',
+    joined_at: now,
+    last_read_at: now,
+    invite_code: null,
+    profile,
+  })
+
+  if (visibility === 'public') {
+    const now = firestoreApi.serverTimestamp()
+    const batch = firestoreApi.writeBatch(db)
+    batch.set(conversationRef, conversationData(now))
+    batch.set(
+      firestoreApi.doc(db, 'conversations', conversationRef.id, 'members', profile.id),
+      ownerData(now),
+    )
+    await batch.commit()
+    return { roomId: conversationRef.id, joinCode: null }
+  }
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const joinCode = generateInviteCode()
+    const inviteRef = firestoreApi.doc(db, 'room_invites', joinCode)
+
+    try {
+      await firestoreApi.runTransaction(db, async (transaction: any) => {
+        const inviteSnapshot = await transaction.get(inviteRef)
+        if (inviteSnapshot.exists()) throw new Error('room-code-collision')
+
+        const now = firestoreApi.serverTimestamp()
+        transaction.set(conversationRef, conversationData(now))
+        transaction.set(
+          firestoreApi.doc(db, 'conversations', conversationRef.id, 'members', profile.id),
+          ownerData(now),
+        )
+        transaction.set(inviteRef, {
+          room_id: conversationRef.id,
+          created_by: profile.id,
+          created_at: now,
+          active: true,
+        })
+      })
+
+      return { roomId: conversationRef.id, joinCode }
+    } catch (caught) {
+      if (caught instanceof Error && caught.message === 'room-code-collision') continue
+      throw new Error(firebaseErrorMessage(caught))
+    }
+  }
+
+  throw new Error('No fue posible generar un código único. Intenta nuevamente.')
 }
 
 export async function subscribeMessages(
@@ -649,6 +841,7 @@ export async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     title: data.title ?? 'Sala',
     description: data.description ?? null,
     category: data.category ?? 'Académicas',
+    visibility: roomVisibility(data),
     avatar_url: data.avatar_url ?? null,
     created_at: toIso(data.created_at),
     creator_id: data.created_by,
