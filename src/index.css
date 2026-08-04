@@ -638,3 +638,33 @@ button:disabled { cursor: not-allowed; opacity: .62; }
     grid-column: 1;
   }
 }
+
+/* Ajuste para Android, tablets y pantallas medianas */
+.auth-page,
+.auth-panel {
+  min-height: 100dvh;
+}
+
+@media (min-width: 600px) and (max-width: 860px) {
+  .auth-panel {
+    width: 100%;
+    padding: 36px 48px;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 599px) {
+  .auth-panel {
+    width: 100%;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .auth-card {
+    width: 100%;
+  }
+}

@@ -10,3 +10,5 @@ dist
 android/.gradle
 android/local.properties
 android/app/build
+
+.env.local
