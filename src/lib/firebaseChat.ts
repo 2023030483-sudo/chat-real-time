@@ -511,6 +511,7 @@ export async function subscribeGroupRooms(
   const conversations = firestoreApi.collection(db, 'conversations')
   const publicRoomsQuery = firestoreApi.query(
     conversations,
+    firestoreApi.where('type', '==', 'group'),
     firestoreApi.where('visibility', '==', 'public'),
   )
   const myRoomsQuery = firestoreApi.query(
