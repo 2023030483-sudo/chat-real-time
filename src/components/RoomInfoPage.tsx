@@ -192,9 +192,20 @@ export function RoomInfoPage({
                       <small>ID interno de la sala</small>
                       <code>{details.id}</code>
                     </div>
-                    <button type="button" onClick={() => void copyValue(details.id, 'id')}>
-                      <Copy size={15} /> {copiedValue === 'id' ? 'Copiado' : 'Copiar ID'}
-                    </button>
+<button
+  className={`room-access-copy-button room-access-copy-button--id${copiedValue === 'id' ? ' is-copied' : ''}`}
+  type="button"
+  onClick={() => void copyValue(details.id, 'id')}
+  aria-label="Copiar ID interno de la sala"
+>
+  <span className="room-access-copy-button__icon" aria-hidden="true">
+    <Copy size={16} />
+  </span>
+
+  <span className="room-access-copy-button__label">
+    {copiedValue === 'id' ? 'ID copiado' : 'Copiar ID'}
+  </span>
+</button>
                   </div>
                 </article>
               ) : null}
@@ -217,14 +228,30 @@ export function RoomInfoPage({
               </article>
 
               {details.creator_id === currentUser.id ? (
+
                 <button
-                  className="delete-room-button"
-                  type="button"
-                  onClick={() => void removeRoom()}
-                  disabled={deleting}
-                >
-                  <Trash2 size={17} /> {deleting ? 'Eliminando sala…' : 'Eliminar sala'}
-                </button>
+  className={`delete-room-button${deleting ? ' is-loading' : ''}`}
+  type="button"
+  onClick={() => void removeRoom()}
+  disabled={deleting}
+  aria-label="Eliminar sala definitivamente"
+>
+  <span className="delete-room-button__icon" aria-hidden="true">
+    <Trash2 size={18} />
+  </span>
+
+  <span className="delete-room-button__content">
+    <strong>{deleting ? 'Eliminando sala…' : 'Eliminar sala'}</strong>
+    <small>
+      {deleting
+        ? 'Espera un momento'
+        : 'Se borrarán mensajes, integrantes y accesos'}
+    </small>
+  </span>
+</button>
+
+
+                
               ) : null}
 
               <button className="back-to-chat-button" type="button" onClick={onBackToChat}>

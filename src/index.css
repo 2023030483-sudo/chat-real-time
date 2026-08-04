@@ -1000,4 +1000,195 @@ button:disabled { cursor: not-allowed; opacity: .62; }
     width: 100%;
   }
 }
+/* =========================================================
+   BOTONES MEJORADOS: COPIAR ID Y ELIMINAR SALA
+   Pegar AL FINAL de:
+   C:\Proyectos\chat-real-time-firestore\src\index.css
+   ========================================================= */
+
+/* Botón moderno para copiar el ID */
+.room-access-row .room-access-copy-button {
+  flex: 0 0 auto;
+  min-width: 122px;
+  min-height: 44px;
+  padding: 6px 13px 6px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #c7d5ff;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f7f9ff 0%, #e9efff 100%);
+  color: #4053c8;
+  box-shadow:
+    0 7px 16px rgba(72, 88, 190, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.room-access-row .room-access-copy-button:hover {
+  transform: translateY(-1px);
+  border-color: #9fb3ff;
+  background: linear-gradient(135deg, #ffffff 0%, #e2eaff 100%);
+  box-shadow:
+    0 10px 22px rgba(72, 88, 190, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.room-access-row .room-access-copy-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.room-access-copy-button__icon {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #5d6ee7, #4053c8);
+  box-shadow: 0 5px 11px rgba(64, 83, 200, 0.25);
+}
+
+.room-access-copy-button__label {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.room-access-row .room-access-copy-button.is-copied {
+  border-color: #9bdcc8;
+  color: #08785e;
+  background: linear-gradient(135deg, #f4fffb, #ddf7ef);
+  box-shadow: 0 8px 18px rgba(8, 120, 94, 0.13);
+}
+
+.room-access-copy-button.is-copied .room-access-copy-button__icon {
+  background: linear-gradient(135deg, #19a77e, #08785e);
+  box-shadow: 0 5px 11px rgba(8, 120, 94, 0.24);
+}
+
+/* Botón de eliminación con apariencia de acción importante */
+.delete-room-button {
+  width: 100%;
+  min-height: 62px;
+  margin-top: 4px;
+  padding: 10px 16px 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  border: 1px solid #f3c2c7;
+  border-radius: 16px;
+  color: #b42332;
+  background: linear-gradient(135deg, #fffafa 0%, #fff0f2 100%);
+  box-shadow:
+    0 8px 20px rgba(180, 35, 50, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.delete-room-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #ee9fa7;
+  background: linear-gradient(135deg, #fff7f7 0%, #ffe5e8 100%);
+  box-shadow:
+    0 12px 26px rgba(180, 35, 50, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.delete-room-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.992);
+}
+
+.delete-room-button__icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #e6505e, #bd2635);
+  box-shadow: 0 7px 15px rgba(189, 38, 53, 0.24);
+}
+
+.delete-room-button__content {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.delete-room-button__content strong {
+  color: #ad1f2d;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.delete-room-button__content small {
+  color: #8f5a61;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.delete-room-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.delete-room-button.is-loading .delete-room-button__icon {
+  animation: delete-room-pulse 1s ease-in-out infinite;
+}
+
+@keyframes delete-room-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+}
+
+@media (max-width: 560px) {
+  .room-access-row .room-access-copy-button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .delete-room-button {
+    min-height: 60px;
+    border-radius: 14px;
+  }
+
+  .delete-room-button__icon {
+    width: 39px;
+    height: 39px;
+    border-radius: 12px;
+  }
+}
 }
