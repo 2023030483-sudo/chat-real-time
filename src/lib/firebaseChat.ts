@@ -516,6 +516,7 @@ export async function subscribeGroupRooms(
   )
   const myRoomsQuery = firestoreApi.query(
     conversations,
+    firestoreApi.where('type', '==', 'group'),
     firestoreApi.where('member_ids', 'array-contains', userId),
   )
 

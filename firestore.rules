@@ -2,10 +2,16 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
 
+    /*
+     * La migración convierte las salas antiguas que no tenían "visibility"
+     * en salas públicas. Mientras el marcador no exista, la app puede leer
+     * los grupos antiguos y agregar ese campo.
+     */
     function migrationPending() {
       return !exists(
         /databases/$(database)/documents/migrations/room-visibility-v1
@@ -114,34 +120,39 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
+
+      /*
+       * GET individual:
+       * - Permite leer un documento inexistente para que las transacciones
+       *   puedan comprobar si una conversación todavía no existe.
+       * - Si existe, solo miembros o salas grupales públicas.
+       */
       allow get: if signedIn() && (
-        (
-          resource.data.type == 'direct'
-          && request.auth.uid in resource.data.member_ids
-        )
-        ||
-        (
+        resource == null
+        || request.auth.uid in resource.data.member_ids
+        || (
           resource.data.type == 'group'
           && (
             migrationPending()
             || resource.data.visibility == 'public'
-            || request.auth.uid in resource.data.member_ids
           )
         )
       );
 
+      /*
+       * LIST/QUERY:
+       * Esta forma coincide exactamente con las consultas de la app:
+       * - where(member_ids, array-contains, uid)
+       * - where(type, ==, group) + where(visibility, ==, public)
+       * - migración temporal: where(type, ==, group)
+       */
       allow list: if signedIn() && (
-        (
-          resource.data.type == 'direct'
-          && request.auth.uid in resource.data.member_ids
-        )
-        ||
-        (
+        request.auth.uid in resource.data.member_ids
+        || (
           resource.data.type == 'group'
           && (
             migrationPending()
             || resource.data.visibility == 'public'
-            || request.auth.uid in resource.data.member_ids
           )
         )
       );
@@ -159,18 +170,14 @@ service cloud.firestore {
             request.resource.data.type == 'group'
             && request.resource.data.member_ids.size() == 1
             && request.resource.data.member_ids.hasOnly([request.auth.uid])
-            && (
-              request.resource.data.visibility in ['public', 'private']
-              ||
-              (
-                migrationPending()
-                && !('visibility' in request.resource.data)
-              )
-            )
+            && request.resource.data.visibility in ['public', 'private']
           )
         );
 
       allow update: if signedIn() && (
+        /*
+         * Un miembro actualiza último mensaje/fecha.
+         */
         (
           request.auth.uid in resource.data.member_ids
           && request.resource.data.member_ids == resource.data.member_ids
@@ -182,6 +189,10 @@ service cloud.firestore {
             ])
         )
         ||
+        /*
+         * Un usuario se agrega a una sala pública o entra a una privada
+         * mediante un código válido.
+         */
         (
           resource.data.type == 'group'
           && !(request.auth.uid in resource.data.member_ids)
@@ -198,14 +209,17 @@ service cloud.firestore {
             ])
           && (
             resource.data.visibility == 'public'
+            || hasValidInvite(conversationId)
             || (
               migrationPending()
               && !('visibility' in resource.data)
             )
-            || hasValidInvite(conversationId)
           )
         )
         ||
+        /*
+         * Migración de sala antigua: agrega visibility = public.
+         */
         (
           migrationPending()
           && resource.data.type == 'group'
@@ -220,8 +234,8 @@ service cloud.firestore {
       allow delete: if false;
 
       match /members/{userId} {
-        allow read: if signedIn()
-          && (
+        allow read: if signedIn() && (
+          (
             conversationData(conversationId).type == 'group'
             && (
               conversationData(conversationId).visibility == 'public'
@@ -231,14 +245,18 @@ service cloud.firestore {
                 && !('visibility' in conversationData(conversationId))
               )
             )
-            ||
-            (
-              conversationData(conversationId).type == 'direct'
-              && isMember(conversationId)
-            )
-          );
+          )
+          ||
+          (
+            conversationData(conversationId).type == 'direct'
+            && isMember(conversationId)
+          )
+        );
 
         allow create: if signedIn() && (
+          /*
+           * Miembros de una conversación directa.
+           */
           (
             conversationDataAfter(conversationId).type == 'direct'
             && request.auth.uid
@@ -247,6 +265,9 @@ service cloud.firestore {
               in conversationDataAfter(conversationId).member_ids
           )
           ||
+          /*
+           * Creador, unión pública o unión privada con código.
+           */
           (
             conversationDataAfter(conversationId).type == 'group'
             && userId == request.auth.uid
