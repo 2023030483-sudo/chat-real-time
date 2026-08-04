@@ -97,7 +97,11 @@ service cloud.firestore {
 
     match /room_invites/{inviteCode} {
       allow get: if signedIn();
-      allow list: if false;
+
+      // Permite que los integrantes consulten el código de su sala privada.
+      allow list: if signedIn()
+        && request.auth.uid
+          in conversationData(resource.data.room_id).member_ids;
 
       allow create: if signedIn()
         && request.resource.data.room_id is string
@@ -231,7 +235,9 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if false;
+      allow delete: if signedIn()
+        && resource.data.type == 'group'
+        && resource.data.created_by == request.auth.uid;
 
       match /members/{userId} {
         allow read: if signedIn() && (
@@ -301,7 +307,9 @@ service cloud.firestore {
               'joined_at'
             ]);
 
-        allow delete: if false;
+        allow delete: if signedIn()
+          && conversationData(conversationId).created_by
+            == request.auth.uid;
       }
 
       match /messages/{messageId} {
@@ -314,8 +322,17 @@ service cloud.firestore {
           && request.resource.data.body.size() <= 4000
           && request.resource.data.message_type in ['text', 'system'];
 
-        allow update, delete: if isMember(conversationId)
+        allow update: if isMember(conversationId)
           && resource.data.sender_id == request.auth.uid;
+
+        allow delete: if signedIn() && (
+          (
+            isMember(conversationId)
+            && resource.data.sender_id == request.auth.uid
+          )
+          || conversationData(conversationId).created_by
+            == request.auth.uid
+        );
       }
     }
   }

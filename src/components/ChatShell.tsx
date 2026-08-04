@@ -126,6 +126,14 @@ export function ChatShell() {
     selectConversation(conversationId)
   }
 
+  const handleRoomDeleted = (roomId: string) => {
+    setConversations((current) => current.filter((item) => item.id !== roomId))
+    setRoomInfo(null)
+    setSelected((current) => current?.id === roomId ? null : current)
+    setPendingSelectionId(null)
+    setSection('groups')
+  }
+
   if (roomInfo) {
     return (
       <main className="app-shell app-shell--section-open">
@@ -135,6 +143,7 @@ export function ChatShell() {
           onBackToChat={() => setRoomInfo(null)}
           onNavigate={navigate}
           onContactCreator={contactRoomCreator}
+          onDeleted={handleRoomDeleted}
         />
       </main>
     )

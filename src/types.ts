@@ -83,4 +83,5 @@ export type RoomDetails = {
   creator_avatar: string | null
   member_count: number
   message_count: number
+  join_code: string | null
 }

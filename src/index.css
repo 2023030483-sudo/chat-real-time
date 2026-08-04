@@ -885,4 +885,119 @@ button:disabled { cursor: not-allowed; opacity: .62; }
   .private-room-code code {
     font-size: 16px;
   }
+  /* =========================================================
+   INFORMACIÓN DE SALA: CÓDIGO PRIVADO Y ELIMINACIÓN
+   ========================================================= */
+.room-access-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #c9d7ff;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f5f8ff, #eef3ff);
+  box-shadow: 0 12px 28px rgba(80, 94, 170, 0.08);
+}
+
+.room-access-card > p {
+  margin: 0;
+  color: #687086;
+  line-height: 1.55;
+}
+
+.room-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #dce4ff;
+}
+
+.room-access-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.room-access-row small {
+  color: #7a8295;
+  font-weight: 700;
+}
+
+.room-access-row strong {
+  color: #5145d9;
+  font-size: clamp(1.1rem, 3vw, 1.45rem);
+  letter-spacing: 0.16em;
+  overflow-wrap: anywhere;
+}
+
+.room-access-row code {
+  max-width: 100%;
+  color: #3f475c;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.room-access-row button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid #cbd6ff;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #4f46d8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.room-access-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.room-access-row--secondary {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.delete-room-button {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #f2b8bd;
+  border-radius: 14px;
+  background: #fff1f2;
+  color: #c52b39;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.delete-room-button:hover:not(:disabled) {
+  background: #ffe4e6;
+}
+
+.delete-room-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+@media (max-width: 560px) {
+  .room-access-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-access-row button {
+    width: 100%;
+  }
+}
 }

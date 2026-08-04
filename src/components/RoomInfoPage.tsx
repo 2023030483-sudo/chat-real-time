@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import {
   ArrowLeft,
   CalendarDays,
+  Copy,
   GraduationCap,
   Info,
+  KeyRound,
   Mail,
   MessageSquareText,
+  Trash2,
 } from 'lucide-react'
-import { getRoomDetails } from '../lib/firebaseChat'
+import { deleteGroupRoom, getRoomDetails } from '../lib/firebaseChat'
 import type { ConversationSummary, NavigationSection, Profile, RoomDetails } from '../types'
 import { Avatar } from './Avatar'
 import { BottomNavigation } from './BottomNavigation'
@@ -20,6 +23,7 @@ type Props = {
   onBackToChat: () => void
   onNavigate: (section: NavigationSection) => void
   onContactCreator: (creatorId: string) => Promise<void>
+  onDeleted: (roomId: string) => void
 }
 
 function formatCreationDate(value: string) {
@@ -30,11 +34,20 @@ function formatCreationDate(value: string) {
   })
 }
 
-export function RoomInfoPage({ conversation, currentUser, onBackToChat, onNavigate, onContactCreator }: Props) {
+export function RoomInfoPage({
+  conversation,
+  currentUser,
+  onBackToChat,
+  onNavigate,
+  onContactCreator,
+  onDeleted,
+}: Props) {
   const [details, setDetails] = useState<RoomDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [contacting, setContacting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [copiedValue, setCopiedValue] = useState<'code' | 'id' | null>(null)
 
   useEffect(() => {
     let active = true
@@ -69,6 +82,46 @@ export function RoomInfoPage({ conversation, currentUser, onBackToChat, onNaviga
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No fue posible abrir el contacto.')
       setContacting(false)
+    }
+  }
+
+  const copyValue = async (value: string, kind: 'code' | 'id') => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const area = document.createElement('textarea')
+        area.value = value
+        area.style.position = 'fixed'
+        area.style.opacity = '0'
+        document.body.appendChild(area)
+        area.select()
+        document.execCommand('copy')
+        document.body.removeChild(area)
+      }
+      setCopiedValue(kind)
+      window.setTimeout(() => setCopiedValue(null), 1800)
+    } catch {
+      setError('No fue posible copiar el dato. Puedes seleccionarlo manualmente.')
+    }
+  }
+
+  const removeRoom = async () => {
+    if (!details || details.creator_id !== currentUser.id || deleting) return
+
+    const confirmed = window.confirm(
+      `¿Eliminar definitivamente la sala “${details.title}”?\n\nSe borrarán sus mensajes, integrantes y código de acceso. Esta acción no se puede deshacer.`,
+    )
+    if (!confirmed) return
+
+    setDeleting(true)
+    setError('')
+    try {
+      await deleteGroupRoom(details.id, currentUser.id)
+      onDeleted(details.id)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No fue posible eliminar la sala.')
+      setDeleting(false)
     }
   }
 
@@ -115,6 +168,37 @@ export function RoomInfoPage({ conversation, currentUser, onBackToChat, onNaviga
                 <small>Ciclo Lectivo 2026</small>
               </article>
 
+              {details.visibility === 'private' ? (
+                <article className="room-access-card">
+                  <div className="room-info-card__label"><KeyRound size={15} /> Acceso a la sala privada</div>
+                  <p>Comparte el código para que otros usuarios puedan unirse desde “Unirse a sala”.</p>
+
+                  <div className="room-access-row">
+                    <div>
+                      <small>Código para unirse</small>
+                      <strong>{details.join_code ?? 'No disponible'}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => details.join_code && void copyValue(details.join_code, 'code')}
+                      disabled={!details.join_code}
+                    >
+                      <Copy size={15} /> {copiedValue === 'code' ? 'Copiado' : 'Copiar'}
+                    </button>
+                  </div>
+
+                  <div className="room-access-row room-access-row--secondary">
+                    <div>
+                      <small>ID interno de la sala</small>
+                      <code>{details.id}</code>
+                    </div>
+                    <button type="button" onClick={() => void copyValue(details.id, 'id')}>
+                      <Copy size={15} /> {copiedValue === 'id' ? 'Copiado' : 'Copiar ID'}
+                    </button>
+                  </div>
+                </article>
+              ) : null}
+
               <article className="room-admin-card">
                 <div className="room-admin-identity">
                   <span className="room-admin-badge"><GraduationCap size={20} /></span>
@@ -131,6 +215,17 @@ export function RoomInfoPage({ conversation, currentUser, onBackToChat, onNaviga
                   <Mail size={14} /> {details.creator_id === currentUser.id ? 'Eres tú' : contacting ? 'Abriendo…' : 'Contactar'}
                 </button>
               </article>
+
+              {details.creator_id === currentUser.id ? (
+                <button
+                  className="delete-room-button"
+                  type="button"
+                  onClick={() => void removeRoom()}
+                  disabled={deleting}
+                >
+                  <Trash2 size={17} /> {deleting ? 'Eliminando sala…' : 'Eliminar sala'}
+                </button>
+              ) : null}
 
               <button className="back-to-chat-button" type="button" onClick={onBackToChat}>
                 <MessageSquareText size={16} /> Volver al chat

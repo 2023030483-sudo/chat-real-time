@@ -716,6 +716,71 @@ export async function createGroupConversation(
   throw new Error('No fue posible generar un código único. Intenta nuevamente.')
 }
 
+async function deleteReferencesInChunks(
+  references: any[],
+  db: any,
+  firestoreApi: any,
+): Promise<void> {
+  const chunkSize = 400
+
+  for (let index = 0; index < references.length; index += chunkSize) {
+    const batch = firestoreApi.writeBatch(db)
+    references.slice(index, index + chunkSize).forEach((reference: any) => {
+      batch.delete(reference)
+    })
+    await batch.commit()
+  }
+}
+
+export async function deleteGroupRoom(
+  roomId: string,
+  currentUserId: string,
+): Promise<void> {
+  const { db, firestoreApi } = await getFirebaseServices()
+  const roomRef = firestoreApi.doc(db, 'conversations', roomId)
+
+  try {
+    const roomSnapshot = await firestoreApi.getDoc(roomRef)
+    if (!roomSnapshot.exists()) {
+      throw new Error('La sala ya no existe.')
+    }
+
+    const room = roomSnapshot.data() as FirestoreConversation
+    if (room.type !== 'group') {
+      throw new Error('Solo se pueden eliminar salas grupales.')
+    }
+    if (room.created_by !== currentUserId) {
+      throw new Error('Solo el administrador que creó la sala puede eliminarla.')
+    }
+
+    const [membersSnapshot, messagesSnapshot, invitesSnapshot] = await Promise.all([
+      firestoreApi.getDocs(
+        firestoreApi.collection(db, 'conversations', roomId, 'members'),
+      ),
+      firestoreApi.getDocs(
+        firestoreApi.collection(db, 'conversations', roomId, 'messages'),
+      ),
+      firestoreApi.getDocs(
+        firestoreApi.query(
+          firestoreApi.collection(db, 'room_invites'),
+          firestoreApi.where('room_id', '==', roomId),
+        ),
+      ),
+    ])
+
+    const references = [
+      ...messagesSnapshot.docs.map((item: any) => item.ref),
+      ...membersSnapshot.docs.map((item: any) => item.ref),
+      ...invitesSnapshot.docs.map((item: any) => item.ref),
+    ]
+
+    await deleteReferencesInChunks(references, db, firestoreApi)
+    await firestoreApi.deleteDoc(roomRef)
+  } catch (caught) {
+    throw new Error(firebaseErrorMessage(caught))
+  }
+}
+
 export async function subscribeMessages(
   conversationId: string,
   onData: (messages: ChatMessage[]) => void,
@@ -838,6 +903,19 @@ export async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     firestoreApi.collection(db, 'conversations', roomId, 'messages'),
   )
 
+  let joinCode: string | null = null
+  if (roomVisibility(data) === 'private') {
+    const inviteSnapshot = await firestoreApi.getDocs(
+      firestoreApi.query(
+        firestoreApi.collection(db, 'room_invites'),
+        firestoreApi.where('room_id', '==', roomId),
+        firestoreApi.limit(10),
+      ),
+    )
+    const activeInvite = inviteSnapshot.docs.find((item: any) => item.data()?.active === true)
+    joinCode = activeInvite?.id ?? null
+  }
+
   return {
     id: roomId,
     title: data.title ?? 'Sala',
@@ -851,5 +929,6 @@ export async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     creator_avatar: data.creator_avatar ?? null,
     member_count: data.member_ids.length,
     message_count: Number(countSnapshot.data().count ?? 0),
+    join_code: joinCode,
   }
 }
