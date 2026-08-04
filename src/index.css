@@ -555,4 +555,86 @@ button:disabled { cursor: not-allowed; opacity: .62; }
     max-width: 88%;
   }
 }
+/* =========================================================
+   CORRECCIÓN DEL CHAT ABIERTO Y MENÚ INFERIOR
+   ========================================================= */
 
+.app-shell.app-shell--chat-open {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.app-shell--chat-open > .conversation-panel {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--chat-open > .chat-view {
+  grid-column: 2;
+  grid-row: 1;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--chat-open > .mobile-bottom-nav {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  z-index: 30;
+  flex-shrink: 0;
+}
+
+.app-shell--chat-open .chat-header {
+  flex: 0 0 auto;
+}
+
+.app-shell--chat-open .chat-content-layout {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--chat-open .chat-conversation-column {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--chat-open .room-members-sidebar {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--chat-open .messages-area {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-shell--chat-open .room-members-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-shell--chat-open .composer-wrap {
+  flex: 0 0 auto;
+}
+
+.app-shell--chat-open .room-members-info-button {
+  flex: 0 0 auto;
+}
+
+/* En celular se oculta la lista lateral y el chat ocupa todo el ancho */
+@media (max-width: 860px) {
+  .app-shell--chat-open > .conversation-panel {
+    display: none;
+  }
+
+  .app-shell--chat-open > .chat-view {
+    grid-column: 1;
+  }
+}

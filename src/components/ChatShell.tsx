@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BottomNavigation } from './BottomNavigation'
 import { useAuth } from '../context/AuthContext'
 import {
   createDirectConversation,
@@ -156,13 +157,18 @@ export function ChatShell() {
         />
 
         <ChatView
-          key={selected.id}
-          conversation={selected}
-          currentUser={profile}
-          onBack={() => setSelected(null)}
-          onMessageSent={() => undefined}
-          onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
-        />
+        key={selected.id}
+        conversation={selected}
+        currentUser={profile}
+         onBack={() => navigate('chats')}
+         onMessageSent={() => undefined}
+        onInfo={selected.type === 'group' ? () => setRoomInfo(selected) : undefined}
+          />
+
+<BottomNavigation
+  active="chats"
+  onNavigate={navigate}
+/>
 
         {newChatOpen ? (
           <NewChatModal currentUser={profile} onClose={() => setNewChatOpen(false)} onCreated={handleCreated} />
